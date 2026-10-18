@@ -19,9 +19,15 @@
   - Powered by Stockfish compiled to WebAssembly / asm.js. Runs entirely offline in an isolated Web Worker without blocking your browser UI.
 - **Real-Time Board Perception:**
   - Fast, event-driven DOM observer that maps chessboard states to standard **FEN** notation with millisecond latency.
-  - Supports both **Chess.com** and **Lichess.org**.
+  - Supports both **Chess.com** and **Lichess.org** (Live matches, Daily games, Puzzles, and Analysis boards).
+- **Accurate Rules & Move Mechanics:**
+  - Dynamic **en-passant** calculation and **castling rights** tracking via move history inspection.
+- **Puzzle & Clockless Mode Detection:**
+  - Intelligently determines active turn on puzzles and analysis setups where digital clocks are absent.
 - **Continuous Dual-Side Analysis:**
   - Computes top engine recommendations regardless of whose turn it is (`White Move` vs `Black Move`), with clear role indicators (`(Your Turn)` vs `(Opponent's Move)`).
+- **Perspective Lock & Auto-Detection:**
+  - 3-way switcher (`AUTO`, `WHITE`, `BLACK`) ensures manual color choices are never overwritten by board flipping.
 - **Engine Strength & Elo Throttling:**
   - Configurable Elo limits (1000 Elo Beginner to 3500 Elo Max) via native Stockfish UCI parameters (`UCI_LimitStrength`, `UCI_Elo`).
 - **Alternative Variations (MultiPV):**
@@ -35,23 +41,23 @@
 
 1. **Clone or Download** this repository:
    ```bash
-   git clone https://github.com/your-username/KnightVision.git
+   git clone https://github.com/emirgms-creator/KnightVision.git
    ```
 2. Open **Google Chrome** and navigate to:
    ```text
    chrome://extensions
    ```
 3. Enable **Developer mode** using the toggle in the top-right corner.
-4. Click **Load unpacked** (top-left) and select the `KnightVision` project directory.
+4. Click **Load unpacked** (top-left) and select the `KnightVision` project directory (or extract `KnightVision.zip`).
 5. Pin the **KnightVision** extension icon to your Chrome toolbar.
 
 ---
 
 ## 🎮 How to Use
 
-1. Open a bot match or study board on [Chess.com](https://www.chess.com) or [Lichess.org](https://lichess.org).
+1. Open a match, study board, or puzzle on [Chess.com](https://www.chess.com) or [Lichess.org](https://lichess.org).
 2. Click the **KnightVision** icon in your Chrome toolbar to open the HUD in your Side Panel.
-3. Select your piece color (**WHITE** or **BLACK**) using the switcher at the top (or let the board auto-detect orientation).
+3. Choose your perspective: Leave on **AUTO** (automatically tracks board orientation) or click **WHITE** / **BLACK** to lock your perspective.
 4. As moves are made, KnightVision automatically tracks the board, computes the best move, and updates the evaluation bar.
 
 ---

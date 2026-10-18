@@ -6,8 +6,73 @@
 (function () {
   const parser = new ChessBoardParser();
   let lastFEN = '';
+  let lastStableState = null;
   let observer = null;
+  let debounceTimer = null;
   let retries = 0;
+  let isInteracting = false;
+  let interactionSafetyTimer = null;
+
+  function setInteracting(val) {
+    isInteracting = val;
+    clearTimeout(interactionSafetyTimer);
+    if (val) {
+      // Safety timeout: prevent getting permanently stuck if mouseup occurs outside window
+      interactionSafetyTimer = setTimeout(() => {
+        isInteracting = false;
+        checkBoardUpdate();
+      }, 1500);
+    }
+  }
+
+  function isDraggingActive() {
+    const draggingEl = document.querySelector(
+      '.dragging, [class*="dragging"], .is-dragging, cg-board.dragging, .cg-wrap.dragging, piece.dragging, .piece.dragging'
+    );
+    return isInteracting || draggingEl !== null;
+  }
+
+  // Pointer event listeners to suppress updates while dragging/holding pieces
+  window.addEventListener('mousedown', (e) => {
+    if (e.target && e.target.closest && e.target.closest('piece, .piece, cg-board, chess-board, wc-chess-board, [data-square], .board')) {
+      setInteracting(true);
+    }
+  }, true);
+
+  window.addEventListener('mouseup', () => {
+    if (isInteracting) {
+      setInteracting(false);
+      // Wait for release animation to settle on destination square
+      setTimeout(checkBoardUpdate, 200);
+    }
+  }, true);
+
+  window.addEventListener('blur', () => {
+    if (isInteracting) {
+      setInteracting(false);
+      setTimeout(checkBoardUpdate, 200);
+    }
+  });
+
+  document.addEventListener('mouseleave', () => {
+    if (isInteracting) {
+      setInteracting(false);
+      setTimeout(checkBoardUpdate, 200);
+    }
+  });
+
+  window.addEventListener('touchstart', (e) => {
+    if (e.target && e.target.closest && e.target.closest('piece, .piece, cg-board, chess-board, wc-chess-board, [data-square], .board')) {
+      setInteracting(true);
+    }
+  }, { passive: true, capture: true });
+
+  window.addEventListener('touchend', () => {
+    if (isInteracting) {
+      setInteracting(false);
+      setTimeout(checkBoardUpdate, 200);
+    }
+  }, { passive: true, capture: true });
 
   function initObserver() {
     const boardElement = document.querySelector(
@@ -46,6 +111,16 @@
 
   function checkBoardUpdate() {
     try {
+      if (!chrome.runtime || !chrome.runtime.id) {
+        if (observer) observer.disconnect();
+        return;
+      }
+
+      // Do not broadcast or analyze mid-drag/hold
+      if (isDraggingActive()) {
+        return;
+      }
+
       const state = parser.getBoardState();
       if (!state || !state.fen) return;
 
@@ -55,6 +130,7 @@
 
       if (currentKey !== lastKey) {
         lastFEN = state.fen;
+        lastStableState = state;
         chrome.runtime.sendMessage({
           type: 'BOARD_UPDATE',
           data: state
@@ -73,12 +149,13 @@
   // Listen for requests from Side Panel
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'GET_BOARD_STATE') {
-      const state = parser.getBoardState();
-      sendResponse(state);
-    } else if (request.type === 'SET_MANUAL_TURN') {
-      parser.turn = request.turn;
-      checkBoardUpdate();
-      sendResponse({ success: true });
+      if (isDraggingActive() && lastStableState) {
+        sendResponse(lastStableState);
+      } else {
+        const state = parser.getBoardState();
+        if (state) lastStableState = state;
+        sendResponse(state);
+      }
     }
     return true;
   });
@@ -90,13 +167,19 @@
     initObserver();
   }
 
-  // Handle SPA URL/Page changes (rematch, next game)
+  // Periodic safety sync and lightweight SPA URL change detection
   let lastUrl = location.href;
-  new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      setTimeout(initObserver, 1500);
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      setTimeout(initObserver, 1000);
     }
-  }).observe(document, { subtree: true, childList: true });
+    if (observer) {
+      checkBoardUpdate();
+    }
+  }, 1000);
+
+  window.addEventListener('popstate', () => {
+    setTimeout(initObserver, 1000);
+  });
 })();

@@ -11,11 +11,3 @@ chrome.runtime.onInstalled.addListener(() => {
 
   console.log('[KnightVision] Installed successfully.');
 });
-
-// Relay messages between content script and side panel if required
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'PING') {
-    sendResponse({ status: 'PONG' });
-  }
-  return true;
-});

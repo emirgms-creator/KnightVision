@@ -24,30 +24,20 @@
     "storage"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "*://*.chess.com/*",
+    "*://*.lichess.org/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "*://*.chess.com/*",
+        "*://*.lichess.org/*"
       ],
       "js": [
         "src/content/board_parser.js",
         "src/content/content.js"
       ],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "src/engine/stockfish.js",
-        "src/engine/stockfish.wasm.js",
-        "src/engine/stockfish.wasm"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
     }
   ]
 }

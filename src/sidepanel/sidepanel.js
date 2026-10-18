@@ -6,14 +6,19 @@
 (function () {
   let engine = null;
   let isEngineReady = false;
+  let isSearching = false;
+  let pendingFen = null;
   let currentFen = '';
-  let activeTurn = 'w';     // 'w' or 'b'
-  let playerColor = 'w';    // 'w' or 'b' (User's chosen color)
+  let colorMode = 'auto';           // 'auto' or 'manual'
+  let manualColor = 'w';            // 'w' or 'b'
+  let detectedBoardColor = 'w';     // 'w' or 'b'
+  let playerColor = 'w';            // Active effective perspective
   let thinkingTime = 1000;
   let currentElo = 'max';
   let multiPVLines = {};
 
   // DOM Elements
+  const btnChooseAuto = document.getElementById('btn-choose-auto');
   const btnChooseWhite = document.getElementById('btn-choose-white');
   const btnChooseBlack = document.getElementById('btn-choose-black');
   const moveColorBadge = document.getElementById('move-color-badge');
@@ -95,6 +100,16 @@
 
     // Parse Best Move
     if (line.startsWith('bestmove')) {
+      isSearching = false;
+
+      // If a newer board state arrived during previous analysis, start analyzing it now
+      if (pendingFen) {
+        const nextFen = pendingFen;
+        pendingFen = null;
+        startSearch(nextFen);
+        return; // Discard stale bestmove
+      }
+
       const parts = line.split(' ');
       const bestMove = parts[1];
       if (bestMove && bestMove !== '(none)') {
@@ -128,9 +143,11 @@
     const mateMatch = line.match(/\bscore mate (-?\d+)\b/);
 
     if (mateMatch) {
-      const mateMoves = parseInt(mateMatch[1], 10);
-      scoreDisplay = `M${mateMoves > 0 ? '+' : ''}${mateMoves}`;
-      numericScore = mateMoves > 0 ? 100 : -100;
+      const rawMate = parseInt(mateMatch[1], 10);
+      // In UCI, score mate is from the perspective of the side to move
+      const mateFromWhite = activeTurn === 'w' ? rawMate : -rawMate;
+      scoreDisplay = `M${mateFromWhite > 0 ? '+' : ''}${mateFromWhite}`;
+      numericScore = mateFromWhite > 0 ? 100 : -100;
     } else if (cpMatch) {
       const rawCp = parseInt(cpMatch[1], 10);
       const cpFromWhite = activeTurn === 'w' ? rawCp : -rawCp;
@@ -184,16 +201,16 @@
 
     const pieceChar = getPieceAtSquare(fromSquare, currentFen);
     const pieceLetter = pieceChar ? pieceChar.toUpperCase() : 'P';
-    const isWhiteTurn = (activeTurn === 'w');
-    const colorKey = isWhiteTurn ? 'w' : 'b';
+    const isPieceBlack = pieceChar ? (pieceChar === pieceChar.toLowerCase()) : (activeTurn === 'b');
+    const colorKey = isPieceBlack ? 'b' : 'w';
 
     const piece = PIECE_CONFIG[colorKey][pieceLetter] || {
-      name: isWhiteTurn ? 'White Piece' : 'Black Piece',
-      icon: isWhiteTurn ? '♙' : '♟'
+      name: isPieceBlack ? 'Black Piece' : 'White Piece',
+      icon: isPieceBlack ? '♟' : '♙'
     };
 
     // Styling according to active side
-    if (isWhiteTurn) {
+    if (!isPieceBlack) {
       moveColorBadge.className = 'badge badge-white';
       moveColorBadge.textContent = '⚪ WHITE';
       pieceBox.className = 'piece-box piece-white';
@@ -208,11 +225,24 @@
     moveRoleBadge.textContent = isUserTurn ? '(Your Turn)' : "(Opponent's Move)";
 
     movePieceIcon.textContent = piece.icon;
-    bestMoveText.textContent = `${fromSquare.toUpperCase()} ➔ ${toSquare.toUpperCase()}`;
+    // Check if target square is occupied (Capture)
+    const targetPieceChar = getPieceAtSquare(toSquare, currentFen);
+    const isCapture = !!targetPieceChar;
+    const targetColorKey = isPieceBlack ? 'w' : 'b';
+    const targetPiece = targetPieceChar ? PIECE_CONFIG[targetColorKey][targetPieceChar.toUpperCase()] : null;
 
-    let desc = `${piece.name} to ${toSquare.toUpperCase()}`;
+    const actionSymbol = isCapture ? '⚔' : '➔';
+    bestMoveText.textContent = `${fromSquare.toUpperCase()} ${actionSymbol} ${toSquare.toUpperCase()}`;
+
+    let desc = '';
+    if (isCapture && targetPiece) {
+      desc = `${piece.name} takes ${targetPiece.name} on ${toSquare.toUpperCase()}`;
+    } else {
+      desc = `${piece.name} to ${toSquare.toUpperCase()}`;
+    }
     if (promotion) {
-      desc += ` (Promote to Queen)`;
+      const promoNames = { Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight' };
+      desc += ` (Promote to ${promoNames[promotion] || promotion})`;
     }
     moveDesc.textContent = desc;
   }
@@ -227,14 +257,19 @@
     alternativesList.innerHTML = '';
     keys.forEach((key) => {
       const line = multiPVLines[key];
-      if (!line || !line.move) return;
+      if (!line || !line.move || line.move.length < 4) return;
+
+      const fromSq = line.move.substring(0, 2);
+      const toSq = line.move.substring(2, 4);
+      const targetChar = getPieceAtSquare(toSq, currentFen);
+      const sym = targetChar ? '⚔' : '➔';
 
       const item = document.createElement('div');
       item.className = 'alt-item';
       item.innerHTML = `
         <div>
           <span class="alt-rank">#${key}</span>
-          <span class="alt-move">${line.move.substring(0, 2).toUpperCase()} ➔ ${line.move.substring(2, 4).toUpperCase()}</span>
+          <span class="alt-move">${fromSq.toUpperCase()} ${sym} ${toSq.toUpperCase()}</span>
           <span style="font-size: 10px; color: #555; margin-left: 6px;">${line.fullLine}</span>
         </div>
         <span class="alt-score">${line.score}</span>
@@ -270,16 +305,25 @@
   }
 
   /**
-   * Sets user's active color perspective
+   * Updates user perspective UI and active playerColor
    */
-  function setPlayerColor(color) {
-    playerColor = color;
-    if (color === 'w') {
-      btnChooseWhite.classList.add('active');
-      btnChooseBlack.classList.remove('active');
-    } else {
-      btnChooseBlack.classList.add('active');
+  function updateColorPerspective() {
+    if (colorMode === 'auto') {
+      btnChooseAuto.classList.add('active');
       btnChooseWhite.classList.remove('active');
+      btnChooseBlack.classList.remove('active');
+      playerColor = detectedBoardColor;
+    } else {
+      btnChooseAuto.classList.remove('active');
+      if (manualColor === 'w') {
+        btnChooseWhite.classList.add('active');
+        btnChooseBlack.classList.remove('active');
+        playerColor = 'w';
+      } else {
+        btnChooseBlack.classList.add('active');
+        btnChooseWhite.classList.remove('active');
+        playerColor = 'b';
+      }
     }
     // Update role badge for current move
     const isUserTurn = (activeTurn === playerColor);
@@ -287,7 +331,20 @@
   }
 
   /**
-   * Trigger Stockfish analysis
+   * Sets user's active color perspective
+   */
+  function setPlayerColor(color, isManual = false) {
+    if (isManual) {
+      colorMode = 'manual';
+      manualColor = color;
+    } else {
+      detectedBoardColor = color;
+    }
+    updateColorPerspective();
+  }
+
+  /**
+   * Trigger Stockfish analysis with race-condition prevention
    */
   function analyzePosition(fen) {
     if (!engine || !isEngineReady || !fen) return;
@@ -296,7 +353,22 @@
     fenInput.value = fen;
     multiPVLines = {};
 
-    engine.postMessage('stop');
+    if (isSearching) {
+      pendingFen = fen;
+      engine.postMessage('stop');
+      return;
+    }
+
+    startSearch(fen);
+  }
+
+  /**
+   * Sends UCI position and search command to engine
+   */
+  function startSearch(fen) {
+    if (!engine || !isEngineReady || !fen) return;
+    isSearching = true;
+    currentFen = fen;
     engine.postMessage(`position fen ${fen}`);
     engine.postMessage(`go movetime ${thinkingTime}`);
   }
@@ -330,7 +402,9 @@
 
       // Auto-sync player color if board orientation was flipped
       if (data.playerColor) {
-        setPlayerColor(data.playerColor);
+        setPlayerColor(data.playerColor, false);
+      } else {
+        updateColorPerspective();
       }
 
       // Always continuously compute best move regardless of turn
@@ -341,12 +415,17 @@
   /**
    * User Controls
    */
+  btnChooseAuto.addEventListener('click', () => {
+    colorMode = 'auto';
+    updateColorPerspective();
+  });
+
   btnChooseWhite.addEventListener('click', () => {
-    setPlayerColor('w');
+    setPlayerColor('w', true);
   });
 
   btnChooseBlack.addEventListener('click', () => {
-    setPlayerColor('b');
+    setPlayerColor('b', true);
   });
 
   eloSelect.addEventListener('change', (e) => {
@@ -360,28 +439,61 @@
     }
   });
 
-  btnScan.addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs || !tabs[0] || !tabs[0].id) return;
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_BOARD_STATE' }, (response) => {
-        if (chrome.runtime.lastError) {
-          // Suppress unchecked runtime error if not on a chess page
-          bestMoveText.textContent = '-- ➔ --';
-          moveDesc.textContent = 'Open a game on Chess.com or Lichess.';
-          return;
-        }
-        if (response && response.fen) {
-          activeTurn = response.turn;
-          if (response.playerColor) {
-            setPlayerColor(response.playerColor);
-          }
-          analyzePosition(response.fen);
-        } else {
-          bestMoveText.textContent = '-- ➔ --';
-          moveDesc.textContent = 'Chess board not detected on this page.';
-        }
-      });
+  function clearBoardState(message = 'Open Chess.com or Lichess to analyze.') {
+    if (!currentFen) return;
+    currentFen = '';
+    pendingFen = null;
+    isSearching = false;
+    if (engine) {
+      engine.postMessage('stop');
+    }
+    bestMoveText.textContent = '-- ➔ --';
+    moveDesc.textContent = message;
+    moveColorBadge.className = 'badge badge-white';
+    moveColorBadge.textContent = '⚪ WAITING';
+    moveRoleBadge.textContent = '';
+    moveDepth.textContent = '';
+    movePieceIcon.textContent = '♙';
+    pieceBox.className = 'piece-box piece-white';
+    evalScore.textContent = '0.00';
+    evalFill.style.width = '50%';
+    fenInput.value = '';
+    fenInput.placeholder = 'FEN: No active game detected';
+    alternativesList.innerHTML = '<div style="color: #666; font-size: 11px; text-align: center; padding: 12px 0;">No game detected on active tab</div>';
+  }
+
+  function fetchActiveBoardState() {
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
+      const tab = tabs && tabs[0];
+      if (!tab) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs2) => {
+          if (tabs2 && tabs2[0]) sendBoardRequest(tabs2[0].id);
+          else clearBoardState();
+        });
+        return;
+      }
+      sendBoardRequest(tab.id);
     });
+  }
+
+  function sendBoardRequest(tabId) {
+    chrome.tabs.sendMessage(tabId, { type: 'GET_BOARD_STATE' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.fen) {
+        clearBoardState();
+        return;
+      }
+      activeTurn = response.turn || 'w';
+      if (response.playerColor) {
+        setPlayerColor(response.playerColor, false);
+      }
+      analyzePosition(response.fen);
+    });
+  }
+
+  btnScan.addEventListener('click', () => {
+    bestMoveText.textContent = '-- ➔ --';
+    moveDesc.textContent = 'Scanning board...';
+    fetchActiveBoardState();
   });
 
   btnCopyFen.addEventListener('click', () => {
@@ -395,6 +507,29 @@
     });
   });
 
-  // Start engine
+  // Listen for tab switching and tab updates to automatically clear or sync
+  if (chrome.tabs && chrome.tabs.onActivated) {
+    chrome.tabs.onActivated.addListener(() => {
+      fetchActiveBoardState();
+    });
+  }
+  if (chrome.tabs && chrome.tabs.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+      if (changeInfo.status === 'complete' || changeInfo.url) {
+        fetchActiveBoardState();
+      }
+    });
+  }
+  if (chrome.tabs && chrome.tabs.onRemoved) {
+    chrome.tabs.onRemoved.addListener(() => {
+      setTimeout(fetchActiveBoardState, 150);
+    });
+  }
+
+  // Start engine and immediately poll active board
   initEngine();
+  fetchActiveBoardState();
+  setTimeout(fetchActiveBoardState, 500);
+  setTimeout(fetchActiveBoardState, 1500);
+  setTimeout(fetchActiveBoardState, 3000);
 })();

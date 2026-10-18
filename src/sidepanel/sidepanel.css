@@ -62,8 +62,8 @@ body {
   background: transparent;
   border: none;
   color: #777777;
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 4px 8px;
+  font-size: 10px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -165,10 +165,21 @@ body {
   border: 1px solid #ffffff;
 }
 
+.piece-box.piece-white #move-piece-icon {
+  color: #000000;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
+
 .piece-box.piece-black {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: #222222;
   border: 2px solid #555555;
+}
+
+.piece-box.piece-black #move-piece-icon {
+  color: #0a0a0a;
+  -webkit-text-stroke: 1.5px #ffffff;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
 .move-details {
