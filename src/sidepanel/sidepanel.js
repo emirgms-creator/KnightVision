@@ -87,6 +87,7 @@
 
     if (line === 'uciok' || line === 'readyok') {
       isEngineReady = true;
+      applyEloSetting(currentElo);
       if (currentFen) {
         analyzePosition(currentFen);
       }
@@ -362,6 +363,14 @@
     startSearch(fen);
   }
 
+  const ELO_CONFIG = {
+    'max':  { skill: 20, maxDepth: null },
+    '2200': { skill: 16, maxDepth: 18 },
+    '1800': { skill: 11, maxDepth: 12 },
+    '1400': { skill: 6,  maxDepth: 8 },
+    '1000': { skill: 1,  maxDepth: 5 }
+  };
+
   /**
    * Sends UCI position and search command to engine
    */
@@ -370,16 +379,28 @@
     isSearching = true;
     currentFen = fen;
     engine.postMessage(`position fen ${fen}`);
-    engine.postMessage(`go movetime ${thinkingTime}`);
+
+    const config = ELO_CONFIG[currentElo] || ELO_CONFIG['max'];
+    if (config.maxDepth) {
+      engine.postMessage(`go movetime ${thinkingTime} depth ${config.maxDepth}`);
+    } else {
+      engine.postMessage(`go movetime ${thinkingTime}`);
+    }
   }
 
   /**
-   * Apply Elo strength limit
+   * Apply Elo strength limit via native Skill Level and UCI parameters
    */
   function applyEloSetting(val) {
     currentElo = val;
     if (!engine || !isEngineReady) return;
 
+    const config = ELO_CONFIG[val] || ELO_CONFIG['max'];
+
+    // 1. Native Stockfish Skill Level (0 to 20)
+    engine.postMessage(`setoption name Skill Level value ${config.skill}`);
+
+    // 2. Also send UCI_LimitStrength & UCI_Elo for compatibility
     if (val === 'max') {
       engine.postMessage('setoption name UCI_LimitStrength value false');
     } else {

@@ -29,7 +29,7 @@
 - **Perspective Lock & Auto-Detection:**
   - 3-way switcher (`AUTO`, `WHITE`, `BLACK`) ensures manual color choices are never overwritten by board flipping.
 - **Engine Strength & Elo Throttling:**
-  - Configurable Elo limits (1000 Elo Beginner to 3500 Elo Max) via native Stockfish UCI parameters (`UCI_LimitStrength`, `UCI_Elo`).
+  - Configurable Elo limits (1000 Elo Beginner to 3500 Elo Max) mapped to native Stockfish `Skill Level` (0–20) and search depth limits.
 - **Alternative Variations (MultiPV):**
   - Displays top 3 candidate moves along with evaluation and depth statistics.
 - **Clean Monochrome Aesthetic:**
