@@ -364,6 +364,12 @@
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !tabs[0] || !tabs[0].id) return;
       chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_BOARD_STATE' }, (response) => {
+        if (chrome.runtime.lastError) {
+          // Suppress unchecked runtime error if not on a chess page
+          bestMoveText.textContent = '-- ➔ --';
+          moveDesc.textContent = 'Open a game on Chess.com or Lichess.';
+          return;
+        }
         if (response && response.fen) {
           activeTurn = response.turn;
           if (response.playerColor) {
@@ -371,8 +377,8 @@
           }
           analyzePosition(response.fen);
         } else {
-          bestMoveText.textContent = 'No Board';
-          moveDesc.textContent = 'Make sure you have a chess game open.';
+          bestMoveText.textContent = '-- ➔ --';
+          moveDesc.textContent = 'Chess board not detected on this page.';
         }
       });
     });

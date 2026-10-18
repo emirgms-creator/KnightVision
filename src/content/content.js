@@ -52,8 +52,11 @@
         chrome.runtime.sendMessage({
           type: 'BOARD_UPDATE',
           data: state
-        }).catch(() => {
-          // Extension context may be reloading or panel not listening
+        }, () => {
+          // Explicitly consume lastError when Side Panel is closed or not listening
+          if (chrome.runtime.lastError) {
+            /* quiet */
+          }
         });
       }
     } catch (err) {
