@@ -1,0 +1,355 @@
+/* Chess AI - Clean Monochrome UI */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #000000;
+  color: #ededed;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: none;
+  min-height: 100vh;
+}
+
+.container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #222222;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-icon {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.brand-text {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffffff;
+}
+
+/* Color Switcher (White / Black) */
+.color-switch {
+  display: flex;
+  border: 1px solid #333333;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.btn-switch {
+  background: transparent;
+  border: none;
+  color: #777777;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-switch:hover {
+  color: #ffffff;
+}
+
+.btn-switch.active {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* Cards */
+.card, .move-card {
+  background-color: #0d0d0d;
+  border: 1px solid #222222;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.card-header, .move-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.card-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #777777;
+}
+
+/* Main Move Card */
+.move-card {
+  border: 1px solid #444444;
+  background-color: #111111;
+}
+
+.badge-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.badge-white {
+  background: #ffffff;
+  color: #000000;
+}
+
+.badge-black {
+  background: #222222;
+  color: #ffffff;
+  border: 1px solid #444444;
+}
+
+.role-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888888;
+}
+
+.depth-text {
+  font-size: 10px;
+  font-family: monospace;
+  color: #666666;
+}
+
+.move-card-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Piece Box - Black & White High Contrast */
+.piece-box {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  border-radius: 4px;
+}
+
+.piece-box.piece-white {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #ffffff;
+}
+
+.piece-box.piece-black {
+  background-color: #000000;
+  color: #ffffff;
+  border: 2px solid #555555;
+}
+
+.move-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.move-coords {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #ffffff;
+  font-family: monospace;
+}
+
+.move-desc {
+  font-size: 11px;
+  color: #999999;
+}
+
+/* Evaluation */
+.eval-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eval-score {
+  font-size: 13px;
+  font-weight: 800;
+  font-family: monospace;
+  color: #ffffff;
+}
+
+.eval-track {
+  width: 100%;
+  height: 6px;
+  background-color: #222222;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.eval-fill {
+  height: 100%;
+  background-color: #ffffff;
+  transition: width 0.3s ease;
+}
+
+.eval-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 600;
+  color: #555555;
+}
+
+/* Alternatives List */
+.alt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alt-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  background-color: #080808;
+  border: 1px solid #1a1a1a;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.alt-rank {
+  color: #666666;
+  font-family: monospace;
+  margin-right: 6px;
+}
+
+.alt-move {
+  font-weight: 700;
+  color: #ffffff;
+  font-family: monospace;
+}
+
+.alt-score {
+  font-family: monospace;
+  color: #888888;
+  font-size: 10px;
+}
+
+.alt-empty {
+  font-size: 11px;
+  color: #555555;
+  text-align: center;
+  padding: 4px 0;
+}
+
+/* Settings */
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-item label {
+  font-size: 11px;
+  color: #888888;
+}
+
+.select-input {
+  background-color: #141414;
+  border: 1px solid #2e2e2e;
+  color: #ffffff;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  outline: none;
+}
+
+.select-input:focus {
+  border-color: #666666;
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  gap: 6px;
+}
+
+.btn {
+  flex: 1;
+  padding: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #333333;
+  color: #ffffff;
+}
+
+.btn-outline:hover {
+  background: #222222;
+  border-color: #555555;
+}
+
+/* FEN Box */
+.fen-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #1c1c1c;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: #080808;
+}
+
+.fen-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #555555;
+}
+
+.fen-input {
+  background: transparent;
+  border: none;
+  color: #777777;
+  font-size: 10px;
+  font-family: monospace;
+  width: 100%;
+  outline: none;
+}

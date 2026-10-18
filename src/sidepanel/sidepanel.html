@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KnightVision</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header: Minimalist Monochrome -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-icon">♞</span>
+        <span class="brand-text">KNIGHTVISION</span>
+      </div>
+      <div class="color-switch">
+        <button id="btn-choose-white" class="btn-switch active" type="button">WHITE</button>
+        <button id="btn-choose-black" class="btn-switch" type="button">BLACK</button>
+      </div>
+    </header>
+
+    <!-- Main Best Move Card -->
+    <div id="hero-card" class="move-card">
+      <div class="move-card-header">
+        <div class="badge-group">
+          <span id="move-color-badge" class="badge">⚪ WHITE</span>
+          <span id="move-role-badge" class="role-badge">(Your Turn)</span>
+        </div>
+        <span id="move-depth" class="depth-text">D: -</span>
+      </div>
+
+      <div class="move-card-body">
+        <div id="piece-box" class="piece-box piece-white">
+          <span id="move-piece-icon">♙</span>
+        </div>
+        <div class="move-details">
+          <div id="best-move-text" class="move-coords">-- ➔ --</div>
+          <div id="move-desc" class="move-desc">Scanning board...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Evaluation Section -->
+    <div class="card eval-card">
+      <div class="card-header">
+        <span class="card-title">EVALUATION</span>
+        <span id="eval-score" class="eval-score">0.00</span>
+      </div>
+      <div class="eval-track">
+        <div id="eval-fill" class="eval-fill" style="width: 50%;"></div>
+      </div>
+      <div class="eval-labels">
+        <span>BLACK</span>
+        <span>EQUAL</span>
+        <span>WHITE</span>
+      </div>
+    </div>
+
+    <!-- Alternative Variations -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">ALTERNATIVE MOVES</span>
+      </div>
+      <div id="alternatives-list" class="alt-list">
+        <div class="alt-empty">Awaiting analysis...</div>
+      </div>
+    </div>
+
+    <!-- Engine Settings -->
+    <div class="card settings-card">
+      <div class="card-header">
+        <span class="card-title">SETTINGS</span>
+      </div>
+      <div class="setting-item">
+        <label for="elo-select">Engine Strength (Elo):</label>
+        <select id="elo-select" class="select-input">
+          <option value="max" selected>Maximum (Stockfish 3500)</option>
+          <option value="2200">2200 Elo (Master)</option>
+          <option value="1800">1800 Elo (Advanced)</option>
+          <option value="1400">1400 Elo (Intermediate)</option>
+          <option value="1000">1000 Elo (Beginner)</option>
+        </select>
+      </div>
+
+      <div class="setting-item">
+        <label for="time-select">Thinking Time:</label>
+        <select id="time-select" class="select-input">
+          <option value="400">400 ms (Fast)</option>
+          <option value="1000" selected>1.0 s (Balanced)</option>
+          <option value="2000">2.0 s (Deep)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="btn-group">
+      <button id="btn-scan" class="btn btn-outline" type="button">⟳ Scan Board</button>
+      <button id="btn-copy-fen" class="btn btn-outline" type="button">📋 FEN</button>
+    </div>
+
+    <!-- FEN Box -->
+    <div class="fen-box">
+      <span class="fen-label">FEN:</span>
+      <input type="text" id="fen-input" class="fen-input" readonly placeholder="Board FEN notation...">
+    </div>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
