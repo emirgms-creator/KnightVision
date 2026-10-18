@@ -92,7 +92,12 @@ Online chess platforms (Chess.com, Lichess) strictly prohibit the use of chess e
 
 ---
 
+## 🔒 Privacy
+
+KnightVision is privacy-first: all analysis runs 100% locally on your machine via WebAssembly Stockfish. Zero game data, personal data, or telemetry is ever collected, stored, or transmitted to any remote servers. See [PRIVACY.md](PRIVACY.md) for the complete policy.
+
 ## 📄 License
 
 This project is open-source and available under the [MIT License](LICENSE).
 The Stockfish chess engine is distributed under the GNU General Public License v3 (GPL-3.0).
+
