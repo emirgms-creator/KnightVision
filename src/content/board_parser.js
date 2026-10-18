@@ -105,37 +105,75 @@ class ChessBoardParser {
    * Parses Lichess DOM structure.
    */
   parseLichess() {
-    const cgContainer = document.querySelector('cg-container, .round__app cg-board');
-    if (!cgContainer) return null;
+    const cgBoard = document.querySelector('cg-board');
+    if (!cgBoard) return null;
 
-    const isFlipped = document.querySelector('.orientation-black, cg-board.orientation-black') !== null;
+    const isFlipped = document.querySelector('.orientation-black, cg-board.orientation-black, .cg-wrap.orientation-black') !== null;
     this.playerColor = isFlipped ? 'b' : 'w';
 
+    const rect = cgBoard.getBoundingClientRect();
+    const boardWidth = rect.width || cgBoard.clientWidth || cgBoard.offsetWidth;
+    if (!boardWidth || boardWidth <= 0) return null;
+    const squareSize = boardWidth / 8;
+
     const grid = Array(8).fill(null).map(() => Array(8).fill(''));
-    const pieces = document.querySelectorAll('cg-board piece');
+    const pieces = cgBoard.querySelectorAll('piece');
+    if (!pieces || pieces.length === 0) return null;
 
     pieces.forEach(el => {
-      let pieceChar = '';
-      const classes = Array.from(el.classList);
-      const isWhite = classes.includes('white');
-      const isBlack = classes.includes('black');
+      // Ignore animation ghost/dragging copies
+      if (el.classList.contains('ghost') || el.classList.contains('dragging')) return;
+
+      const isWhite = el.classList.contains('white');
+      const isBlack = el.classList.contains('black');
+      if (!isWhite && !isBlack) return;
 
       let type = '';
-      if (classes.includes('pawn')) type = 'P';
-      else if (classes.includes('knight')) type = 'N';
-      else if (classes.includes('bishop')) type = 'B';
-      else if (classes.includes('rook')) type = 'R';
-      else if (classes.includes('queen')) type = 'Q';
-      else if (classes.includes('king')) type = 'K';
-
+      if (el.classList.contains('pawn')) type = 'P';
+      else if (el.classList.contains('knight')) type = 'N';
+      else if (el.classList.contains('bishop')) type = 'B';
+      else if (el.classList.contains('rook')) type = 'R';
+      else if (el.classList.contains('queen')) type = 'Q';
+      else if (el.classList.contains('king')) type = 'K';
       if (!type) return;
-      pieceChar = isWhite ? type : type.toLowerCase();
 
-      // Check cg-key attribute or transform
+      const pieceChar = isWhite ? type : type.toLowerCase();
+
+      // Priority 1: CSS transform translate(Xpx, Ypx) or translate3d(Xpx, Ypx, 0)
+      const transform = el.style.transform;
+      if (transform) {
+        const matchPx = transform.match(/translate(?:3d)?\(\s*(-?[\d.]+)px\s*,\s*(-?[\d.]+)px/);
+        const matchPct = transform.match(/translate(?:3d)?\(\s*(-?[\d.]+)%\s*,\s*(-?[\d.]+)%/);
+
+        let col = -1;
+        let row = -1;
+
+        if (matchPx) {
+          const x = parseFloat(matchPx[1]);
+          const y = parseFloat(matchPx[2]);
+          col = Math.round(x / squareSize);
+          row = Math.round(y / squareSize);
+        } else if (matchPct) {
+          col = Math.round(parseFloat(matchPct[1]) / 12.5);
+          row = Math.round(parseFloat(matchPct[2]) / 12.5);
+        }
+
+        if (col >= 0 && col < 8 && row >= 0 && row < 8) {
+          if (isFlipped) {
+            col = 7 - col;
+            row = 7 - row;
+          }
+          grid[row][col] = pieceChar;
+          return;
+        }
+      }
+
+      // Priority 2: cg-key fallback (e.g. cg-key="e4")
       const key = el.getAttribute('cg-key') || el.parentElement?.getAttribute('cg-key');
       if (key && key.length === 2) {
-        const col = key.charCodeAt(0) - 97; // a -> 0
-        const row = 8 - parseInt(key[1], 10);
+        const col = key.charCodeAt(0) - 97;
+        const rank = parseInt(key[1], 10);
+        const row = 8 - rank;
         if (row >= 0 && row < 8 && col >= 0 && col < 8) {
           grid[row][col] = pieceChar;
         }
@@ -234,10 +272,24 @@ class ChessBoardParser {
    * Detects active turn on Lichess.
    */
   detectTurnLichess() {
-    const bottomRunning = document.querySelector('.ruser-bottom .rclock-running');
-    const topRunning = document.querySelector('.ruser-top .rclock-running');
+    // 1. Move count from notation tree (l4x, .moves, .tview2, rm6)
+    const moveNodes = document.querySelectorAll('l4x move, .moves move, .tview2 move, rm6 move, .game__moves move');
+    if (moveNodes && moveNodes.length > 0) {
+      return (moveNodes.length % 2 === 1) ? 'b' : 'w';
+    }
+
+    // 2. Active running clocks
+    const bottomRunning = document.querySelector('.ruser-bottom .rclock-running, .rclock-bottom.running, .rclock-bottom.active');
+    const topRunning = document.querySelector('.ruser-top .rclock-running, .rclock-top.running, .rclock-top.active');
     if (bottomRunning) return this.playerColor;
     if (topRunning) return this.playerColor === 'w' ? 'b' : 'w';
+
+    // 3. User indicator / turn class
+    const turnBottom = document.querySelector('.ruser-bottom.turn, .round__app .ruser-bottom.turn, .ruser-bottom.active');
+    const turnTop = document.querySelector('.ruser-top.turn, .round__app .ruser-top.turn, .ruser-top.active');
+    if (turnBottom) return this.playerColor;
+    if (turnTop) return this.playerColor === 'w' ? 'b' : 'w';
+
     return 'w';
   }
 }
