@@ -439,11 +439,14 @@
     }
   });
 
+  let lastChessTabId = null;
+
   function clearBoardState(message = 'Open Chess.com or Lichess to analyze.') {
     if (!currentFen) return;
     currentFen = '';
     pendingFen = null;
     isSearching = false;
+    lastChessTabId = null;
     if (engine) {
       engine.postMessage('stop');
     }
@@ -459,29 +462,36 @@
     evalFill.style.width = '50%';
     fenInput.value = '';
     fenInput.placeholder = 'FEN: No active game detected';
-    alternativesList.innerHTML = '<div style="color: #666; font-size: 11px; text-align: center; padding: 12px 0;">No game detected on active tab</div>';
+    alternativesList.innerHTML = '<div style="color: #666; font-size: 11px; text-align: center; padding: 12px 0;">No active game detected</div>';
   }
 
-  function fetchActiveBoardState() {
+  function fetchActiveBoardState(explicitScan = false) {
     chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
       const tab = tabs && tabs[0];
       if (!tab) {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs2) => {
-          if (tabs2 && tabs2[0]) sendBoardRequest(tabs2[0].id);
-          else clearBoardState();
+          if (tabs2 && tabs2[0]) sendBoardRequest(tabs2[0].id, explicitScan);
+          else if (explicitScan) clearBoardState();
         });
         return;
       }
-      sendBoardRequest(tab.id);
+      sendBoardRequest(tab.id, explicitScan);
     });
   }
 
-  function sendBoardRequest(tabId) {
+  function sendBoardRequest(tabId, explicitScan = false) {
     chrome.tabs.sendMessage(tabId, { type: 'GET_BOARD_STATE' }, (response) => {
       if (chrome.runtime.lastError || !response || !response.fen) {
-        clearBoardState();
+        // If user explicitly pressed "Scan Board" on a non-chess page, clear the display.
+        // But if user simply switched to another tab, KEEP the last chess analysis alive!
+        if (explicitScan) {
+          clearBoardState('No chess board detected on active tab.');
+        }
         return;
       }
+
+      // Valid chess board detected on this tab
+      lastChessTabId = tabId;
       activeTurn = response.turn || 'w';
       if (response.playerColor) {
         setPlayerColor(response.playerColor, false);
@@ -493,7 +503,7 @@
   btnScan.addEventListener('click', () => {
     bestMoveText.textContent = '-- ➔ --';
     moveDesc.textContent = 'Scanning board...';
-    fetchActiveBoardState();
+    fetchActiveBoardState(true);
   });
 
   btnCopyFen.addEventListener('click', () => {
@@ -507,29 +517,47 @@
     });
   });
 
-  // Listen for tab switching and tab updates to automatically clear or sync
+  // When switching tabs:
+  // - If switching to a chess tab, immediately sync and update analysis.
+  // - If switching to another tab (e.g. YouTube), keep existing analysis intact.
   if (chrome.tabs && chrome.tabs.onActivated) {
     chrome.tabs.onActivated.addListener(() => {
-      fetchActiveBoardState();
+      fetchActiveBoardState(false);
+      // Double-check after 200ms in case tab was waking up from background sleep
+      setTimeout(() => fetchActiveBoardState(false), 200);
     });
   }
+
+  // When tab navigates to a new URL
   if (chrome.tabs && chrome.tabs.onUpdated) {
     chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
       if (changeInfo.status === 'complete' || changeInfo.url) {
-        fetchActiveBoardState();
+        // If the active chess tab navigates away to a non-chess domain, clear
+        if (tabId === lastChessTabId && changeInfo.url) {
+          const isChess = changeInfo.url.includes('chess.com') || changeInfo.url.includes('lichess.org');
+          if (!isChess) {
+            clearBoardState('Navigated away from chess game.');
+            return;
+          }
+        }
+        fetchActiveBoardState(false);
       }
     });
   }
+
+  // Only clear analysis if the user actually CLOSES the chess tab
   if (chrome.tabs && chrome.tabs.onRemoved) {
-    chrome.tabs.onRemoved.addListener(() => {
-      setTimeout(fetchActiveBoardState, 150);
+    chrome.tabs.onRemoved.addListener((closedTabId) => {
+      if (closedTabId === lastChessTabId) {
+        clearBoardState('Chess tab was closed.');
+      }
     });
   }
 
   // Start engine and immediately poll active board
   initEngine();
-  fetchActiveBoardState();
-  setTimeout(fetchActiveBoardState, 500);
-  setTimeout(fetchActiveBoardState, 1500);
-  setTimeout(fetchActiveBoardState, 3000);
+  fetchActiveBoardState(false);
+  setTimeout(() => fetchActiveBoardState(false), 500);
+  setTimeout(() => fetchActiveBoardState(false), 1500);
+  setTimeout(() => fetchActiveBoardState(false), 3000);
 })();
