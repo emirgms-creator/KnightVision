@@ -14,6 +14,23 @@ class ChessBoardParser {
    * Detects the platform and returns the current board state as FEN.
    */
   getBoardState() {
+    // 1. Chess.com DOM (Custom elements <chess-board> / <wc-chess-board>)
+    if (document.querySelector('chess-board, wc-chess-board, #board-layout-main')) {
+      const state = this.parseChessCom();
+      if (state) return state;
+    }
+
+    // 2. Lichess DOM (<cg-board> / Chessground)
+    if (document.querySelector('cg-board, cg-container')) {
+      const state = this.parseLichess();
+      if (state) return state;
+    }
+
+    // 3. Chessboard.js / FIDE Online Arena / PyChess / Generic Square Boards
+    const genericState = this.parseChessboardJs();
+    if (genericState) return genericState;
+
+    // Fallbacks if hostname matches
     if (window.location.hostname.includes('chess.com')) {
       return this.parseChessCom();
     } else if (window.location.hostname.includes('lichess.org')) {
@@ -290,6 +307,107 @@ class ChessBoardParser {
     if (turnBottom) return this.playerColor;
     if (turnTop) return this.playerColor === 'w' ? 'b' : 'w';
 
+    return 'w';
+  }
+
+  /**
+   * Parses Chessboard.js and standard square-based DOM boards (FIDE Online Arena, PyChess, ChessBase, etc.)
+   */
+  parseChessboardJs() {
+    // Look for squares with data-square or square-[a-h][1-8]
+    const squareElements = document.querySelectorAll('[data-square], [class*="square-"]');
+    if (!squareElements || squareElements.length < 16) return null;
+
+    // Detect orientation
+    const isFlipped = document.querySelector('.orientation-black, [class*="black-orientation"], [class*="flipped"]') !== null;
+    this.playerColor = isFlipped ? 'b' : 'w';
+
+    const grid = Array(8).fill(null).map(() => Array(8).fill(''));
+    let piecesFound = 0;
+
+    squareElements.forEach(sq => {
+      // Get square name (e.g. "a1", "e4")
+      let sqName = sq.getAttribute('data-square');
+      if (!sqName || !/^[a-h][1-8]$/.test(sqName)) {
+        if (sq.classList && sq.classList.forEach) {
+          sq.classList.forEach(cls => {
+            const match = cls.match(/^square-([a-h][1-8])$/);
+            if (match) sqName = match[1];
+          });
+        }
+      }
+      if (!sqName || !/^[a-h][1-8]$/.test(sqName)) return;
+
+      const col = sqName.charCodeAt(0) - 97;
+      const rank = parseInt(sqName[1], 10);
+      const row = 8 - rank;
+
+      // Find piece inside square (image, div, svg)
+      const pieceEl = sq.querySelector('img, div[class*="piece"], svg[class*="piece"]');
+      if (!pieceEl) return;
+
+      let pieceChar = '';
+
+      // Priority 1: data-piece attribute (e.g. data-piece="wK", data-piece="bP")
+      const dataPiece = pieceEl.getAttribute('data-piece') || sq.getAttribute('data-piece');
+      if (dataPiece && /^[wb][pnbrqk]$/i.test(dataPiece)) {
+        const color = dataPiece[0].toLowerCase();
+        const type = dataPiece[1].toUpperCase();
+        pieceChar = color === 'w' ? type : type.toLowerCase();
+      }
+
+      // Priority 2: Image src attribute (e.g. .../wK.png, .../bN.svg, .../wP.webp)
+      if (!pieceChar && pieceEl.tagName === 'IMG') {
+        const src = pieceEl.src || pieceEl.getAttribute('src') || '';
+        const match = src.match(/(?:^|[\/_-])([wb])([pnbrqk])\.(?:png|svg|webp|gif)/i);
+        if (match) {
+          const color = match[1].toLowerCase();
+          const type = match[2].toUpperCase();
+          pieceChar = color === 'w' ? type : type.toLowerCase();
+        }
+      }
+
+      // Priority 3: Class names (e.g. piece-wK, piece-bP)
+      if (!pieceChar && pieceEl.classList && pieceEl.classList.forEach) {
+        pieceEl.classList.forEach(cls => {
+          const match = cls.match(/(?:^|\b)(?:piece-)?([wb])([pnbrqk])(?:\b|$)/i);
+          if (match) {
+            const color = match[1].toLowerCase();
+            const type = match[2].toUpperCase();
+            pieceChar = color === 'w' ? type : type.toLowerCase();
+          }
+        });
+      }
+
+      if (pieceChar && row >= 0 && row < 8 && col >= 0 && col < 8) {
+        grid[row][col] = pieceChar;
+        piecesFound++;
+      }
+    });
+
+    if (piecesFound < 2) return null; // Not enough pieces to be a valid chess board
+
+    this.turn = this.detectTurnGeneric();
+    const fenPosition = this.gridToFen(grid);
+    const castling = this.estimateCastlingRights(grid);
+    const fullFEN = `${fenPosition} ${this.turn} ${castling} - 0 1`;
+
+    return {
+      fen: fullFEN,
+      playerColor: this.playerColor,
+      turn: this.turn,
+      platform: 'generic'
+    };
+  }
+
+  /**
+   * Generic turn detector from move notation lists
+   */
+  detectTurnGeneric() {
+    const moveNodes = document.querySelectorAll('.moves move, .move-list .node, .game-moves .move, .history tr, .notation-move');
+    if (moveNodes && moveNodes.length > 0) {
+      return (moveNodes.length % 2 === 1) ? 'b' : 'w';
+    }
     return 'w';
   }
 }

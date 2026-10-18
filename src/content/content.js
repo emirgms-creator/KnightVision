@@ -7,15 +7,21 @@
   const parser = new ChessBoardParser();
   let lastFEN = '';
   let observer = null;
-  let debounceTimer = null;
+  let retries = 0;
 
   function initObserver() {
-    const boardElement = document.querySelector('chess-board, wc-chess-board, #board-layout-main, .board, cg-board, cg-container');
+    const boardElement = document.querySelector(
+      'chess-board, wc-chess-board, #board-layout-main, .board, cg-board, cg-container, .cg-wrap, [class*="chessboard"], [data-square], #board'
+    );
     if (!boardElement) {
-      // Retry if board is not loaded yet (single-page app navigation)
-      setTimeout(initObserver, 1000);
+      // Retry up to 8 times (~12 seconds) so non-chess sites don't consume CPU
+      if (retries < 8) {
+        retries++;
+        setTimeout(initObserver, 1500);
+      }
       return;
     }
+    retries = 0;
 
     if (observer) {
       observer.disconnect();
@@ -23,18 +29,18 @@
 
     observer = new MutationObserver(() => {
       clearTimeout(debounceTimer);
-      // 100ms debounce to allow multi-piece DOM animation updates to settle
-      debounceTimer = setTimeout(checkBoardUpdate, 100);
+      // 150ms debounce to allow multi-piece DOM animation updates to settle
+      debounceTimer = setTimeout(checkBoardUpdate, 150);
     });
 
     observer.observe(boardElement, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'cg-key']
+      attributeFilter: ['class', 'style', 'cg-key', 'data-piece', 'src', 'data-square']
     });
 
-    console.log('[KnightVision] Board observer active.');
+    console.log('[KnightVision] Universal board observer active.');
     checkBoardUpdate();
   }
 

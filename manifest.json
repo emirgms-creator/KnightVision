@@ -24,14 +24,12 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*.chess.com/*",
-    "*://*.lichess.org/*"
+    "<all_urls>"
   ],
   "content_scripts": [
     {
       "matches": [
-        "*://*.chess.com/*",
-        "*://*.lichess.org/*"
+        "<all_urls>"
       ],
       "js": [
         "src/content/board_parser.js",
